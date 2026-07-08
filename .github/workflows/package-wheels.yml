@@ -1,0 +1,57 @@
+name: Package Python dependencies
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-wheels:
+    name: Build wheels and upload artifact (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev cargo pkg-config
+
+      - name: Upgrade pip, wheel, setuptools
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+
+      - name: Prepare directories
+        run: |
+          rm -rf wheelhouse packages || true
+          mkdir -p wheelhouse packages
+
+      - name: Download source distributions and wheels
+        run: |
+          # Download wheels/sdists for all packages and their dependencies into packages/
+          python -m pip download -r requirements.txt -d packages
+
+      - name: Build wheels
+        run: |
+          # Build wheels for packages listed in requirements.txt (including building from sdists when necessary)
+          python -m pip wheel -r requirements.txt -w wheelhouse
+
+      - name: Show wheelhouse contents
+        run: |
+          echo "Wheelhouse size and sample:"
+          du -sh wheelhouse || true
+          ls -1 wheelhouse | sed -n '1,200p' || true
+
+      - name: Upload wheelhouse artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheelhouse-py312
+          path: |
+            wheelhouse
+            packages
+            requirements.txt
